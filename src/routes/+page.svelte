@@ -9,20 +9,24 @@
 	let wordsQueue = [];
 
 	let voicesLoading = true;
-	let voices = [];
-	let selectedVoiceIndex = 0;
+	let selectedVoice = null;
 
 	onMount(() => {
 		if (browser && typeof speechSynthesis !== 'undefined') {
 			const loadVoices = () => {
 				voicesLoading = false;
-				voices = speechSynthesis.getVoices();
+				const voices = speechSynthesis.getVoices();
 
-				const catalanVoiceIndex = voices.findIndex(
+				selectedVoice = voices.find(
 					(voice) => voice.lang.startsWith('ca') || voice.lang.includes('cat')
 				);
-				if (catalanVoiceIndex !== -1) {
-					selectedVoiceIndex = catalanVoiceIndex;
+
+				if (!selectedVoice) {
+					selectedVoice = voices.find((voice) => voice.lang.startsWith('en'));
+				}
+
+				if (!selectedVoice && voices.length > 0) {
+					selectedVoice = voices[0];
 				}
 			};
 
@@ -36,17 +40,13 @@
 		}
 	});
 
-	$: selectedVoice = voices[selectedVoiceIndex];
-
 	function speakText(text) {
-		if (!browser || typeof speechSynthesis === 'undefined' || voices.length === 0) return;
+		if (!browser || typeof speechSynthesis === 'undefined' || !selectedVoice) return;
 
 		speechSynthesis.cancel();
 
 		const utterance = new SpeechSynthesisUtterance(text);
-		if (selectedVoice) {
-			utterance.voice = selectedVoice;
-		}
+		utterance.voice = selectedVoice;
 
 		utterance.rate = 0.9;
 		utterance.pitch = 1.1;
@@ -123,30 +123,15 @@
 				typeof speechSynthesis === 'undefined' ||
 				voicesLoading ||
 				isSpinning ||
-				voices.length === 0}
+				!selectedVoice}
 			class="speak-button"
 		>
 			🔊 Repeteix
 		</button>
 	</div>
 
-	{#if !browser || typeof speechSynthesis === 'undefined'}
-		<div class="voice-loading">Opció de text a veu no disponible</div>
-	{:else if voicesLoading}
-		<div class="voice-loading">Carregant veus...</div>
-	{:else if voices.length === 0}
+	{#if !selectedVoice && !voicesLoading}
 		<div class="voice-loading">No s'han trobat veus disponibles</div>
-	{:else}
-		<div class="voice-selector">
-			<label for="voice-select">Selecciona la veu:</label>
-			<select id="voice-select" bind:value={selectedVoiceIndex}>
-				{#each voices as voice, index}
-					<option value={index}>
-						{voice.name} ({voice.lang})
-					</option>
-				{/each}
-			</select>
-		</div>
 	{/if}
 </main>
 
@@ -262,39 +247,6 @@
 		color: #666;
 		font-style: italic;
 		margin-top: 20px;
-	}
-
-	.voice-selector {
-		margin-top: 20px;
-		padding: 15px;
-		background: #f8f9fa;
-		border-radius: 8px;
-		border: 1px solid #e9ecef;
-	}
-
-	.voice-selector label {
-		display: block;
-		margin-bottom: 8px;
-		font-weight: bold;
-		color: #333;
-	}
-
-	select {
-		width: 100%;
-		max-width: 400px;
-		padding: 10px;
-		font-size: 1em;
-		border: 2px solid #ddd;
-		border-radius: 6px;
-		background: white;
-		cursor: pointer;
-		transition: border-color 0.2s ease;
-	}
-
-	select:focus {
-		outline: none;
-		border-color: #ff6b6b;
-		box-shadow: 0 0 5px rgba(255, 107, 107, 0.3);
 	}
 
 	.sentence-display::before {
