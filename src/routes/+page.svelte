@@ -1,4 +1,6 @@
 <script>
+	import { browser } from '$app/environment';
+	import { onMount } from 'svelte';
 	import { insults } from '$lib/words.js';
 	import confetti from 'canvas-confetti';
 
@@ -10,21 +12,34 @@
 	let voices = [];
 	let selectedVoiceIndex = 0;
 
-	speechSynthesis.addEventListener('voiceschanged', () => {
-		voicesLoading = false;
-		voices = speechSynthesis.getVoices();
-		const catalanVoiceIndex = voices.findIndex(
-			(voice) => voice.lang.startsWith('ca') || voice.lang.includes('cat')
-		);
-		if (catalanVoiceIndex !== -1) {
-			selectedVoiceIndex = catalanVoiceIndex;
+	onMount(() => {
+		if (browser && typeof speechSynthesis !== 'undefined') {
+			const loadVoices = () => {
+				voicesLoading = false;
+				voices = speechSynthesis.getVoices();
+
+				const catalanVoiceIndex = voices.findIndex(
+					(voice) => voice.lang.startsWith('ca') || voice.lang.includes('cat')
+				);
+				if (catalanVoiceIndex !== -1) {
+					selectedVoiceIndex = catalanVoiceIndex;
+				}
+			};
+
+			if (speechSynthesis.getVoices().length > 0) {
+				loadVoices();
+			} else {
+				speechSynthesis.addEventListener('voiceschanged', loadVoices);
+			}
+		} else {
+			voicesLoading = false;
 		}
 	});
 
 	$: selectedVoice = voices[selectedVoiceIndex];
 
 	function speakText(text) {
-		if (voices.length === 0) return;
+		if (!browser || typeof speechSynthesis === 'undefined' || voices.length === 0) return;
 
 		speechSynthesis.cancel();
 
@@ -32,6 +47,7 @@
 		if (selectedVoice) {
 			utterance.voice = selectedVoice;
 		}
+
 		utterance.rate = 0.9;
 		utterance.pitch = 1.1;
 
@@ -74,6 +90,7 @@
 					spread: 70,
 					origin: { y: 0.6 }
 				});
+
 				setTimeout(() => {
 					speakText(currentSentence);
 				}, 500);
@@ -102,15 +119,23 @@
 
 		<button
 			on:click={() => speakText(currentSentence)}
-			disabled={voicesLoading || isSpinning}
+			disabled={!browser ||
+				typeof speechSynthesis === 'undefined' ||
+				voicesLoading ||
+				isSpinning ||
+				voices.length === 0}
 			class="speak-button"
 		>
 			🔊 Repeteix
 		</button>
 	</div>
 
-	{#if voicesLoading}
+	{#if !browser || typeof speechSynthesis === 'undefined'}
+		<div class="voice-loading">Opció de text a veu no disponible</div>
+	{:else if voicesLoading}
 		<div class="voice-loading">Carregant veus...</div>
+	{:else if voices.length === 0}
+		<div class="voice-loading">No s'han trobat veus disponibles</div>
 	{:else}
 		<div class="voice-selector">
 			<label for="voice-select">Selecciona la veu:</label>
