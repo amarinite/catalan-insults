@@ -5,13 +5,46 @@
 	let currentSentence = 'Baliga-balaga';
 	let isSpinning = false;
 	let wordsQueue = [];
+
+	let voicesLoading = true;
+	let voices = [];
+	let selectedVoiceIndex = 0;
+
+	speechSynthesis.addEventListener('voiceschanged', () => {
+		voicesLoading = false;
+		voices = speechSynthesis.getVoices();
+		const catalanVoiceIndex = voices.findIndex(
+			(voice) => voice.lang.startsWith('ca') || voice.lang.includes('cat')
+		);
+		if (catalanVoiceIndex !== -1) {
+			selectedVoiceIndex = catalanVoiceIndex;
+		}
+	});
+
+	$: selectedVoice = voices[selectedVoiceIndex];
+
+	function speakText(text) {
+		if (voices.length === 0) return;
+
+		speechSynthesis.cancel();
+
+		const utterance = new SpeechSynthesisUtterance(text);
+		if (selectedVoice) {
+			utterance.voice = selectedVoice;
+		}
+		utterance.rate = 0.9;
+		utterance.pitch = 1.1;
+
+		speechSynthesis.speak(utterance);
+	}
+
 	function generateSentence() {
 		if (isSpinning) return;
 
 		isSpinning = true;
 		wordsQueue = [];
-		const totalWords = 8;
 
+		const totalWords = 8;
 		for (let i = 0; i < totalWords; i++) {
 			wordsQueue.push(insults[Math.floor(Math.random() * insults.length)]);
 		}
@@ -36,20 +69,24 @@
 				setTimeout(slideNext, speed);
 			} else {
 				isSpinning = false;
-
 				confetti({
 					particleCount: 100,
 					spread: 70,
 					origin: { y: 0.6 }
 				});
+				setTimeout(() => {
+					speakText(currentSentence);
+				}, 500);
 			}
 		};
+
 		slideNext();
 	}
 </script>
 
 <main>
 	<h1>🎰 Catalan Insults Generator</h1>
+
 	<div class="slot-container">
 		<div class="sentence-display" class:spinning={isSpinning}>
 			<div class="word-slide" class:sliding={isSpinning}>
@@ -57,11 +94,35 @@
 			</div>
 		</div>
 	</div>
+
 	<div class="button-container">
 		<button on:click={generateSentence} disabled={isSpinning}>
 			{isSpinning ? '🎰 Carregant...' : "Insulta'm"}
 		</button>
+
+		<button
+			on:click={() => speakText(currentSentence)}
+			disabled={voicesLoading || isSpinning}
+			class="speak-button"
+		>
+			🔊 Repeteix
+		</button>
 	</div>
+
+	{#if voicesLoading}
+		<div class="voice-loading">Carregant veus...</div>
+	{:else}
+		<div class="voice-selector">
+			<label for="voice-select">Selecciona la veu:</label>
+			<select id="voice-select" bind:value={selectedVoiceIndex}>
+				{#each voices as voice, index}
+					<option value={index}>
+						{voice.name} ({voice.lang})
+					</option>
+				{/each}
+			</select>
+		</div>
+	{/if}
 </main>
 
 <style>
@@ -133,6 +194,7 @@
 		gap: 10px;
 		justify-content: center;
 		flex-wrap: wrap;
+		margin-bottom: 20px;
 	}
 
 	button {
@@ -149,6 +211,15 @@
 		text-transform: uppercase;
 	}
 
+	.speak-button {
+		background: linear-gradient(45deg, #4caf50, #45a049);
+		min-width: 130px;
+	}
+
+	.speak-button:hover:not(:disabled) {
+		background: linear-gradient(45deg, #45a049, #3d8b40);
+	}
+
 	button:hover:not(:disabled) {
 		background: linear-gradient(45deg, #ee5a52, #dc4545);
 		transform: translateY(-2px);
@@ -160,6 +231,45 @@
 		cursor: not-allowed;
 		transform: none;
 		box-shadow: none;
+	}
+
+	.voice-loading {
+		color: #666;
+		font-style: italic;
+		margin-top: 20px;
+	}
+
+	.voice-selector {
+		margin-top: 20px;
+		padding: 15px;
+		background: #f8f9fa;
+		border-radius: 8px;
+		border: 1px solid #e9ecef;
+	}
+
+	.voice-selector label {
+		display: block;
+		margin-bottom: 8px;
+		font-weight: bold;
+		color: #333;
+	}
+
+	select {
+		width: 100%;
+		max-width: 400px;
+		padding: 10px;
+		font-size: 1em;
+		border: 2px solid #ddd;
+		border-radius: 6px;
+		background: white;
+		cursor: pointer;
+		transition: border-color 0.2s ease;
+	}
+
+	select:focus {
+		outline: none;
+		border-color: #ff6b6b;
+		box-shadow: 0 0 5px rgba(255, 107, 107, 0.3);
 	}
 
 	.sentence-display::before {
